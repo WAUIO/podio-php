@@ -17,14 +17,17 @@
   },
   "repositories": [
     {
-      "type": "vcs",
-      "url": "https://github.com/Andrianina007/wau-keen-io"
+      "type": "path",
+      "url": "/home/bundinho/public_html/WAU/wau-keen-io"
     }
   ],
   "suggest": {
     "kdyby/curl-ca-bundle": "Improve security through providing current CA ROOT certificates bundle"
   },
   "autoload": {
-    "classmap": ["lib/", "models/"]
+    "classmap": ["lib/", "models/"],
+    "psr-0": {
+      "\\WauPodio": "waupodio/"
+    }
   }
 }
