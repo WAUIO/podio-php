@@ -141,7 +141,7 @@ class Podio {
   }
 
   public static function notify($method, $url, $attributes = [], $options= []) {
-    $observable = new \WauPodio\Observer\PodioObservable($method, $url, $attributes, $options);
+    $observable = new \WauKeenIo\Observer\PodioObservable($method, $url, $attributes, $options);
     $observer = new \WauKeenIo\Observer\PodioApiObserver();
     $observable->attach($observer);
     $observable->notify();
@@ -153,7 +153,7 @@ class Podio {
       throw new Exception('Client has not been setup with client id and client secret.');
     }
 
-
+    self::notify($method, $url, $attributes, $options);
 
     // Reset attributes so we can reuse curl object
     curl_setopt(self::$ch, CURLOPT_POSTFIELDS, null);
