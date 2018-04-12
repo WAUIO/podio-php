@@ -279,6 +279,7 @@ class Podio
     self::$last_response = $response;
 
     $payload = array_merge(array('response' => $response), $payload);
+    self::fireEvent('request.done', $payload);
 
     if (!isset($options['oauth_request'])) {
       $curl_info = curl_getinfo(self::$ch, CURLINFO_HEADER_OUT);
