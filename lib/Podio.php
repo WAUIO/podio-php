@@ -152,11 +152,11 @@ class Podio
 
   public static function request($method, $url, $attributes = array(), $options = array())
   {
+    $payload = array('method' => $method, 'attributes' => $attributes, 'options' => $options);
+    self::fireEvent('request', $payload);
     if (!self::$ch) {
       throw new Exception('Client has not been setup with client id and client secret.');
     }
-
-    self::fireEvent('request', array('method' => $method, 'attributes' => $attributes, 'options' => $options));
 
     // Reset attributes so we can reuse curl object
     curl_setopt(self::$ch, CURLOPT_POSTFIELDS, null);
@@ -267,8 +267,9 @@ class Podio
 
     $raw_response = curl_exec(self::$ch);
     if ($raw_response === false) {
-      self::fireEvent('error', array());
-      throw new PodioConnectionError('Connection to Podio API failed: [' . curl_errno(self::$ch) . '] ' . curl_error(self::$ch), curl_errno(self::$ch));
+      $connectionError = new PodioConnectionError('Connection to Podio API failed: [' . curl_errno(self::$ch) . '] ' . curl_error(self::$ch), curl_errno(self::$ch));
+      self::fireEvent('error', array_merge(array('error' => $connectionError), $payload));
+      throw $connectionError;
     }
     $raw_headers_size = curl_getinfo(self::$ch, CURLINFO_HEADER_SIZE);
 
@@ -276,7 +277,9 @@ class Podio
     $response->status = curl_getinfo(self::$ch, CURLINFO_HTTP_CODE);
     $response->headers = self::parse_headers(substr($raw_response, 0, $raw_headers_size));
     self::$last_response = $response;
-    self::fireEvent('response', $response);
+
+    $payload = array_merge(array('response' => $response), $payload);
+    self::fireEvent('response',$payload);
 
     if (!isset($options['oauth_request'])) {
       $curl_info = curl_getinfo(self::$ch, CURLINFO_HEADER_OUT);
@@ -287,6 +290,7 @@ class Podio
       case 200 :
       case 201 :
       case 204 :
+        self::fireEvent('response.success', $payload);
         return $response;
         break;
       case 400 :
@@ -295,9 +299,11 @@ class Podio
         if (strstr($body['error'], 'invalid_grant')) {
           // Reset access token & refresh_token
           self::clear_authentication();
+          self::fireEvent('response.invalid_grant_error', $payload);
           throw new PodioInvalidGrantError($response->body, $response->status, $url);
           break;
         } else {
+          self::fireEvent('response.bad_request', $payload);
           throw new PodioBadRequestError($response->body, $response->status, $url);
         }
         break;
@@ -311,43 +317,54 @@ class Podio
               return self::request($method, $original_url, $attributes);
             } else {
               self::clear_authentication();
+              self::fireEvent('response.error.authorization', $payload);
               throw new PodioAuthorizationError($response->body, $response->status, $url);
             }
           } else {
             // We have tried in vain to get a new access token. Log the user out.
             self::clear_authentication();
+            self::fireEvent('response.error.authorization', $payload);
             throw new PodioAuthorizationError($response->body, $response->status, $url);
           }
         } elseif (strstr($body['error'], 'invalid_request') || strstr($body['error'], 'unauthorized')) {
           // Access token is invalid.
           self::clear_authentication();
+          self::fireEvent('response.error.authorization', $payload);
           throw new PodioAuthorizationError($response->body, $response->status, $url);
         }
         break;
       case 403 :
+        self::fireEvent('response.error.forbidden', $payload);
         throw new PodioForbiddenError($response->body, $response->status, $url);
         break;
       case 404 :
+        self::fireEvent('response.error.not_found', $payload);
         throw new PodioNotFoundError($response->body, $response->status, $url);
         break;
       case 409 :
+        self::fireEvent('response.error.conflict', $payload);
         throw new PodioConflictError($response->body, $response->status, $url);
         break;
       case 410 :
+        self::fireEvent('response.error.gone', $payload);
         throw new PodioGoneError($response->body, $response->status, $url);
         break;
       case 420 :
+        self::fireEvent('response.error.rate_limit', $payload);
         throw new PodioRateLimitError($response->body, $response->status, $url);
         break;
       case 500 :
+        self::fireEvent('response.error.server', $payload);
         throw new PodioServerError($response->body, $response->status, $url);
         break;
       case 502 :
       case 503 :
       case 504 :
+        self::fireEvent('response.error.unavailable', $payload);
         throw new PodioUnavailableError($response->body, $response->status, $url);
         break;
       default :
+        self::fireEvent('response.error', $payload);
         throw new PodioError($response->body, $response->status, $url);
         break;
     }
@@ -511,27 +528,15 @@ class Podio
     }
   }
 
+  /**
+   * Dispatch the event to the Event Listener
+   * @param $scope
+   * @param array $payload
+   * @param bool $halt
+   */
   private static function fireEvent($scope, $payload = array(), $halt = false)
   {
-    $event = \Event\PodioEvent::getInstance();
+    $event = \PodioApplication\Events\PodioEvent::getInstance();
     $event->fire("podio.{$scope}", $payload, $halt);
   }
 }
-
-
-//class PodioEvent
-//{
-//  private static $intance = null;
-//
-//  private function __construct()
-//  {
-//  }
-//
-//  public static function getInstance(\Illuminate\Contracts\Container\Container $container = null)
-//  {
-//    if (is_null(self::$intance)) {
-//      self::$intance = new \Illuminate\Events\Dispatcher($container);
-//    }
-//    return self::$intance;
-//  }
-//}

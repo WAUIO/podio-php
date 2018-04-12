@@ -20,8 +20,8 @@
   },
   "autoload": {
     "classmap": ["lib/", "models/"],
-    "psr-0": {
-      "\\Event": "events/"
+    "psr-4": {
+      "PodioApplication\\": "application/"
     }
   }
 }
