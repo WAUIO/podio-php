@@ -278,7 +278,7 @@ class Podio
     $response->headers = self::parse_headers(substr($raw_response, 0, $raw_headers_size));
     self::$last_response = $response;
 
-    $payload = array_merge(array('response' => $response), $payload);
+    $payload = array_merge($payload, array('response' => $response));
     self::fireEvent('request.done', $payload);
 
     if (!isset($options['oauth_request'])) {
