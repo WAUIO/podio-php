@@ -551,6 +551,7 @@ class Podio
    */
   public static function listen($events, $listener, $priority = 0)
   {
-    (\PodioApplication\Events\PodioEvent::getInstance())->listen("podio.{$events}", $listener, $priority);
+    $e = \PodioApplication\Events\PodioEvent::getInstance();
+    $e->listen("podio.{$events}", $listener, $priority);
   }
 }
