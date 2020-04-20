@@ -50,9 +50,58 @@ class PodioFile extends PodioObject {
   /**
    * @see https://developers.podio.com/doc/files/upload-file-1004361
    */
-  public static function upload($file_path, $file_name) {
+  public static function _upload($file_path, $file_name) {
     $source = defined('PHP_MAJOR_VERSION') && PHP_MAJOR_VERSION >= 5 ? new CurlFile(realpath($file_path)) : '@'.realpath($file_path);
     return self::member(Podio::post("/file/v2/", array('source' => $source, 'filename' => $file_name), array('upload' => TRUE, 'filesize' => filesize($file_path))));
+  }
+                                                                                                                                                               
+  public static function upload($file_path, $file_name) {                                                                                                           
+    $source = defined('PHP_MAJOR_VERSION') && PHP_MAJOR_VERSION >= 5 ? new CurlFile(realpath($file_path)) : '@'.realpath($file_path);  
+                                                                                                                                       
+    $ch = curl_init();                                                                                                               
+                                                                                                                                                                     
+    curl_setopt($ch, CURLOPT_URL, 'https://api.podio.com:443/file/v2/');                                                                                             
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);                                                                                                                     
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);                                                                                                                     
+    curl_setopt($ch, CURLOPT_POST, 1);                                                                                                                               
+    curl_setopt($ch, CURLOPT_VERBOSE, TRUE);                                                                                                                         
+    curl_setopt($ch, CURLOPT_SAFE_UPLOAD, TRUE);                                                                                                                     
+                                                                                                                                       
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                                                                  
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 1);                                                                                                                     
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);                                                                                                                     
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Podio PHP Client/4.4.3');                                                                     
+    curl_setopt($ch, CURLOPT_HEADER, true);                                                                                                                          
+    curl_setopt($ch, CURLINFO_HEADER_OUT, true);                                                                                                                     
+                                                                                                                                                                     
+    $data = [                                                                                                                                                        
+      "source" => $source,                                                                                                                                           
+      "filename" => $file_name,                                                                                                                                      
+    ];                                                                                                                                                               
+                                                                                                                                                                     
+    $headers = array();                                                                                                                                              
+    $headers[] = 'Authorization: Bearer '. Podio::$oauth->access_token;                                                                                              
+    $headers[] = 'Content-Type: multipart/form-data';                                                                                                                
+    $headers[] = 'Accept: application/json';                                                                                                                         
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                                                                 
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);                                                                                                                  
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);                                                                                                                     
+                                                                                                                                                                     
+    $raw_response = curl_exec($ch);                                                                                                                                  
+                                                                                                                                                                     
+    if ($raw_response === false) {                                                                                                                                   
+      throw new Exception('Connection to Podio API failed: [' . curl_errno($ch) . '] ' . curl_error($ch), curl_errno($ch));                                          
+    }                                                                                                                                                                
+    $raw_headers_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);                                                                       
+                                                                                                                                       
+    $response = new PodioResponse();                                                                                                   
+    $response->body = substr($raw_response, $raw_headers_size);                                                                        
+    $response->status = curl_getinfo($ch, CURLINFO_HTTP_CODE);                                                                         
+    $response->headers = Podio::parse_headers(substr($raw_response, 0, $raw_headers_size));                                          
+                                                                                                                                     
+    curl_close($ch);                                                                       
+    return self::member($response);                                                                                                    
+                                                                                                                                       
   }
 
   /**
